@@ -1,0 +1,836 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>掌盈 · 月度经营分析</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+  :root {
+    --bg:#0a0f1e;--bg2:#111827;--bg3:#1a2235;--card:#151d2e;
+    --border:#1e2d45;--border2:#243352;
+    --blue:#3b82f6;--blue2:#60a5fa;--blue-dim:rgba(59,130,246,0.12);
+    --green:#10b981;--green-dim:rgba(16,185,129,0.12);
+    --amber:#f59e0b;--amber-dim:rgba(245,158,11,0.12);
+    --red:#ef4444;--red-dim:rgba(239,68,68,0.12);
+    --text:#e2e8f0;--text2:#94a3b8;--text3:#64748b;
+    --radius:12px;--radius2:8px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Noto Sans SC',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+  .top-bar{position:sticky;top:0;z-index:100;background:rgba(10,15,30,0.92);backdrop-filter:blur(16px);border-bottom:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:32px;height:32px;background:linear-gradient(135deg,var(--blue),#6366f1);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px}
+  .logo-text{font-size:17px;font-weight:700;letter-spacing:-0.3px}
+  .logo-sub{font-size:11px;color:var(--text3);font-weight:400}
+  .beta-tag{font-size:10px;background:var(--blue-dim);color:var(--blue2);border:1px solid rgba(59,130,246,0.3);padding:3px 8px;border-radius:20px;font-weight:500}
+  .main{max-width:680px;margin:0 auto;padding:24px 16px 80px}
+  .hero{background:linear-gradient(135deg,#1e3a5f 0%,#1a2235 100%);border:1px solid rgba(59,130,246,0.25);border-radius:16px;padding:24px;margin-bottom:24px;position:relative;overflow:hidden}
+  .hero::before{content:'';position:absolute;top:-40px;right:-40px;width:160px;height:160px;background:radial-gradient(circle,rgba(59,130,246,0.15) 0%,transparent 70%);pointer-events:none}
+  .hero-title{font-size:20px;font-weight:700;margin-bottom:6px;line-height:1.3}
+  .hero-sub{font-size:13px;color:var(--text2);line-height:1.6}
+  .hero-steps{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
+  .step-badge{display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:5px 10px;font-size:12px;color:var(--text2)}
+  .step-badge span{width:18px;height:18px;background:var(--blue);color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0}
+  .section{margin-bottom:20px}
+  .section-header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .section-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+  .section-icon.blue{background:var(--blue-dim)}.section-icon.green{background:var(--green-dim)}.section-icon.amber{background:var(--amber-dim)}.section-icon.red{background:var(--red-dim)}
+  .section-title{font-size:15px;font-weight:700;color:var(--text)}
+  .section-desc{font-size:12px;color:var(--text3);margin-top:1px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .input-row{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  .input-row.single{grid-template-columns:1fr}
+  .field{padding:14px 16px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);position:relative}
+  .field:nth-child(even),.input-row.single .field{border-right:none}
+  .input-row .field:nth-last-child(-n+2){border-bottom:none}
+  .input-row.single .field:last-child{border-bottom:none}
+  .field-label{font-size:11px;color:var(--text3);font-weight:500;margin-bottom:6px;letter-spacing:0.3px;display:flex;align-items:center;gap:4px}
+  .field-label .req{color:var(--blue2);font-size:9px}.field-label .opt{color:var(--text3);font-size:9px;background:var(--bg3);padding:1px 5px;border-radius:4px}
+  .field input,.field select{width:100%;background:transparent;border:none;outline:none;color:var(--text);font-size:15px;font-weight:500;font-family:'Noto Sans SC',sans-serif;padding:0;-webkit-appearance:none}
+  .field input::placeholder{color:var(--text3);font-weight:400;font-size:14px}
+  .field select{color:var(--text2)}.field select option{background:var(--bg2)}
+  .field-unit{position:absolute;right:16px;bottom:14px;font-size:12px;color:var(--text3);pointer-events:none}
+  .apikey-section{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:16px;margin-bottom:20px}
+  .apikey-section .label{font-size:12px;color:var(--amber);font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .apikey-section input{width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:var(--radius2);padding:10px 14px;color:var(--text);font-size:13px;font-family:monospace;outline:none}
+  .apikey-section input:focus{border-color:var(--blue)}
+  .apikey-section .hint{font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6}
+  .apikey-section .hint a{color:var(--blue2);text-decoration:none}
+  .submit-wrap{margin-top:24px}
+  .btn-submit{width:100%;padding:16px;background:linear-gradient(135deg,var(--blue) 0%,#6366f1 100%);border:none;border-radius:var(--radius);color:white;font-size:16px;font-weight:700;font-family:'Noto Sans SC',sans-serif;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all 0.2s;letter-spacing:0.5px}
+  .btn-submit:hover{opacity:0.92;transform:translateY(-1px)}.btn-submit:active{transform:translateY(0)}.btn-submit:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+  .loading-wrap{display:none;text-align:center;padding:48px 24px}
+  .loading-wrap.show{display:block}
+  .loading-dots{display:flex;justify-content:center;gap:8px;margin-bottom:16px}
+  .dot{width:10px;height:10px;background:var(--blue);border-radius:50%;animation:bounce 1.2s infinite}
+  .dot:nth-child(2){animation-delay:0.2s;background:#6366f1}.dot:nth-child(3){animation-delay:0.4s;background:var(--green)}
+  @keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:0.7}30%{transform:translateY(-12px);opacity:1}}
+  .loading-text{color:var(--text2);font-size:14px;line-height:1.8}
+  .loading-step{font-size:12px;color:var(--text3);margin-top:8px}
+  .report-wrap{display:none;animation:fadeUp 0.5s ease}
+  .report-wrap.show{display:block}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+  .report-header{text-align:center;padding:24px 0 20px;border-bottom:1px solid var(--border);margin-bottom:20px}
+  .report-header .emoji{font-size:40px;margin-bottom:8px}
+  .report-header h2{font-size:18px;font-weight:700;margin-bottom:4px}
+  .report-header p{font-size:12px;color:var(--text3)}
+  .numbers-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:20px}
+  .num-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px}
+  .num-card.highlight{background:linear-gradient(135deg,rgba(59,130,246,0.15) 0%,rgba(99,102,241,0.1) 100%);border-color:rgba(59,130,246,0.35)}
+  .num-card.warn{background:var(--red-dim);border-color:rgba(239,68,68,0.3)}
+  .num-card.good{background:var(--green-dim);border-color:rgba(16,185,129,0.3)}
+  .num-label{font-size:11px;color:var(--text3);margin-bottom:6px;font-weight:500}
+  .num-value{font-size:22px;font-weight:900;letter-spacing:-0.5px;line-height:1}
+  .num-value.blue{color:var(--blue2)}.num-value.green{color:var(--green)}.num-value.red{color:var(--red)}.num-value.amber{color:var(--amber)}
+  .num-sub{font-size:11px;color:var(--text3);margin-top:4px}
+  .cost-bars{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:20px}
+  .cost-bars h3{font-size:13px;font-weight:600;color:var(--text2);margin-bottom:14px}
+  .cost-item{margin-bottom:12px}.cost-item:last-child{margin-bottom:0}
+  .cost-item-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .cost-name{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:6px}
+  .cost-warn-tag{font-size:9px;background:var(--red-dim);color:var(--red);border:1px solid rgba(239,68,68,0.3);padding:1px 5px;border-radius:4px}
+  .cost-ok-tag{font-size:9px;background:var(--green-dim);color:var(--green);border:1px solid rgba(16,185,129,0.3);padding:1px 5px;border-radius:4px}
+  .cost-pct{font-size:13px;font-weight:700}
+  .bar-track{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+  .bar-fill{height:100%;border-radius:3px;transition:width 1s ease}
+  .waimai-breakdown{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+  .wb-header{background:rgba(239,68,68,0.1);border-bottom:1px solid rgba(239,68,68,0.2);padding:12px 16px;font-size:13px;font-weight:700;color:var(--red);display:flex;align-items:center;gap:8px}
+  .wb-row{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px}
+  .wb-row:last-child{border-bottom:none}
+  .wb-row.total{background:rgba(239,68,68,0.08);font-weight:700;font-size:15px}
+  .wb-label{color:var(--text2)}.wb-value{font-weight:600}.wb-value.minus{color:var(--red)}.wb-value.result{color:var(--red);font-size:18px}
+  .ai-report{background:linear-gradient(135deg,rgba(59,130,246,0.08) 0%,rgba(99,102,241,0.05) 100%);border:1px solid rgba(59,130,246,0.2);border-radius:var(--radius);padding:20px;margin-bottom:20px}
+  .ai-report-header{display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid rgba(59,130,246,0.15)}
+  .ai-avatar{width:36px;height:36px;background:linear-gradient(135deg,var(--blue),#6366f1);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+  .ai-name{font-size:13px;font-weight:600;color:var(--blue2)}.ai-role{font-size:11px;color:var(--text3)}
+  .ai-content{font-size:14px;line-height:1.9;color:var(--text);white-space:pre-wrap;word-break:break-word}
+  .cta-card{background:linear-gradient(135deg,#1e3a5f 0%,#1a2235 100%);border:1px solid rgba(59,130,246,0.25);border-radius:var(--radius);padding:20px;text-align:center}
+  .cta-card h3{font-size:16px;font-weight:700;margin-bottom:6px}
+  .cta-card p{font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6}
+  .btn-reset{background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius2);color:var(--text);padding:10px 24px;font-size:13px;font-family:'Noto Sans SC',sans-serif;cursor:pointer;transition:all 0.2s}
+  .btn-reset:hover{background:rgba(255,255,255,0.12)}
+  .error-box{display:none;background:var(--red-dim);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius);padding:14px 16px;margin-top:12px;font-size:13px;color:var(--red);line-height:1.6;white-space:pre-wrap}
+  .error-box.show{display:block}
+  .cursor-blink{display:inline-block;width:2px;height:14px;background:var(--blue2);margin-left:2px;vertical-align:middle;animation:blink 0.8s infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+  @media(max-width:400px){
+    .numbers-grid{grid-template-columns:1fr}
+    .input-row{grid-template-columns:1fr}
+    .field{border-right:none!important}
+    .input-row .field:nth-last-child(-n+2){border-bottom:1px solid var(--border)}
+    .input-row .field:last-child{border-bottom:none}
+  }
+</style>
+</head>
+<body>
+
+<div id="appWrap">
+<div class="top-bar">
+  <div class="logo">
+    <div class="logo-icon">🍜</div>
+    <div>
+      <div class="logo-text">掌盈</div>
+      <div class="logo-sub">把经营数据变成行动建议</div>
+    </div>
+  </div>
+  <div class="beta-tag">体验版</div>
+</div>
+
+<div class="main">
+
+  <div class="hero">
+    <div class="hero-title">填完数字，AI帮你把账算清楚 💡</div>
+    <div class="hero-sub">大概5分钟，让你知道上个月真正赚了多少<br>外卖到底赚钱还是亏钱，一目了然</div>
+    <div class="hero-steps">
+      <div class="step-badge"><span>1</span>填基本信息</div>
+      <div class="step-badge"><span>2</span>填收入数字</div>
+      <div class="step-badge"><span>3</span>填成本数字</div>
+      <div class="step-badge"><span>4</span>看AI分析报告</div>
+    </div>
+  </div>
+
+  <div id="formArea">
+
+    <div class="apikey-section">
+      <div class="label">⚙️ Claude API Key（一次性配置）</div>
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-..." autocomplete="off">
+      <div class="hint">
+        还没有？去 <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> 注册并充值5美元即可使用。<br>
+        Key 只存在你的浏览器里，不会上传到任何服务器。
+      </div>
+    </div>
+
+    <!-- 基本信息 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon blue">🏪</div>
+        <div><div class="section-title">基本信息</div><div class="section-desc">告诉我你的餐厅基本情况</div></div>
+      </div>
+      <div class="card">
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">餐厅名称 <span class="req">必填</span></div>
+            <input type="text" id="shopName" placeholder="比如：老王快餐">
+          </div>
+          <div class="field">
+            <div class="field-label">月份 <span class="req">必填</span></div>
+            <input type="text" id="month" placeholder="如：2026年3月">
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">餐厅类型 <span class="req">必填</span></div>
+            <select id="shopType">
+              <option value="">请选择</option>
+              <option value="快餐">快餐</option>
+              <option value="正餐">正餐</option>
+              <option value="茶饮">茶饮/奶茶</option>
+              <option value="烧烤">烧烤</option>
+              <option value="火锅">火锅</option>
+              <option value="其他">其他</option>
+            </select>
+          </div>
+          <div class="field">
+            <div class="field-label">本月营业天数 <span class="req">必填</span></div>
+            <input type="number" id="bizDays" placeholder="如：26">
+            <div class="field-unit">天</div>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">门店面积 <span class="opt">选填</span></div>
+            <input type="number" id="area" placeholder="如：80">
+            <div class="field-unit">㎡</div>
+          </div>
+          <div class="field">
+            <div class="field-label">目标月净利润 <span class="opt">选填</span></div>
+            <input type="number" id="targetProfit" placeholder="如：15000">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 收入 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon green">💰</div>
+        <div><div class="section-title">收入来源</div><div class="section-desc">外卖填「钱包到账」金额，不是GMV</div></div>
+      </div>
+      <div class="card">
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">美团外卖 实际到账 <span class="req">必填</span></div>
+            <input type="number" id="meituanIncome" placeholder="如：28000">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">堂食收入 <span class="req">必填</span></div>
+            <input type="number" id="dineIncome" placeholder="如：15000">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">饿了么/其他 到账 <span class="opt">选填</span></div>
+            <input type="number" id="otherPlatform" placeholder="没有填0" value="0">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">堂食接待桌数 <span class="opt">选填</span></div>
+            <input type="number" id="tableCnt" placeholder="如：520">
+            <div class="field-unit">桌</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 外卖成本 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon red">⚡</div>
+        <div><div class="section-title">外卖成本细化</div><div class="section-desc">「震惊时刻」的关键数据</div></div>
+      </div>
+      <div class="card">
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">美团GMV（顾客实付总额）<span class="req">必填</span></div>
+            <input type="number" id="meituanGmv" placeholder="如：35000">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">美团佣金率 <span class="req">必填</span></div>
+            <input type="number" id="commRate" placeholder="如：20" value="20">
+            <div class="field-unit">%</div>
+          </div>
+        </div>
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">广告费 <span class="req">必填</span></div>
+            <input type="number" id="adFee" placeholder="没有填0" value="0">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">外卖包装费 <span class="req">必填</span></div>
+            <input type="number" id="packFee" placeholder="如：1500">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 食材 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon amber">🥬</div>
+        <div><div class="section-title">食材成本</div><div class="section-desc">库存填大致估算，不需要精确</div></div>
+      </div>
+      <div class="card">
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">本月进货总额 <span class="req">必填</span></div>
+            <input type="number" id="foodBuy" placeholder="如：18000">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">月末库存估值 <span class="req">必填</span></div>
+            <input type="number" id="stockEnd" placeholder="如：2000">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+        <div class="input-row single">
+          <div class="field">
+            <div class="field-label">月初库存估值 <span class="opt">选填，没记录填0</span></div>
+            <input type="number" id="stockStart" placeholder="上月剩余食材" value="0">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 人工 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon blue">👨‍🍳</div>
+        <div><div class="section-title">人工成本</div><div class="section-desc">按岗位分开填</div></div>
+      </div>
+      <div class="card">
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">后厨工资合计 <span class="req">必填</span></div>
+            <input type="number" id="kitchenWage" placeholder="主厨+帮厨合计">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">前厅工资合计 <span class="req">必填</span></div>
+            <input type="number" id="frontWage" placeholder="服务员+收银合计">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+        <div class="input-row single">
+          <div class="field">
+            <div class="field-label">其他人工（兼职等）<span class="opt">选填</span></div>
+            <input type="number" id="otherWage" placeholder="没有填0" value="0">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 固定支出 -->
+    <div class="section">
+      <div class="section-header">
+        <div class="section-icon amber">🏠</div>
+        <div><div class="section-title">固定支出</div><div class="section-desc">水电气可以填合计，不用拆分</div></div>
+      </div>
+      <div class="card">
+        <div class="input-row">
+          <div class="field">
+            <div class="field-label">房租（含物业）<span class="req">必填</span></div>
+            <input type="number" id="rent" placeholder="如：8000">
+            <div class="field-unit">元</div>
+          </div>
+          <div class="field">
+            <div class="field-label">水电气合计 <span class="req">必填</span></div>
+            <input type="number" id="util" placeholder="如：2500">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+        <div class="input-row single">
+          <div class="field">
+            <div class="field-label">其他支出（维修/杂项）<span class="opt">选填</span></div>
+            <input type="number" id="otherCost" placeholder="没有填0" value="0">
+            <div class="field-unit">元</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="submit-wrap">
+      <button class="btn-submit" id="btnSubmit" onclick="handleSubmit()">
+        🤖 开始分析，生成AI经营报告
+      </button>
+      <div class="error-box" id="errorBox"></div>
+    </div>
+
+  </div>
+
+  <!-- Loading -->
+  <div class="loading-wrap" id="loadingWrap">
+    <div class="loading-dots"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>
+    <div class="loading-text">AI正在帮你算账并生成分析报告<br>通常需要15–30秒</div>
+    <div class="loading-step" id="loadingStep">正在计算各项成本比例…</div>
+  </div>
+
+  <!-- 报告 -->
+  <div class="report-wrap" id="reportWrap">
+    <div class="report-header">
+      <div class="emoji">📊</div>
+      <h2 id="reportTitle">月度经营分析报告</h2>
+      <p id="reportSub">分析完成 · 以下是你本月的经营情况</p>
+    </div>
+    <div class="numbers-grid" id="numbersGrid"></div>
+    <div class="waimai-breakdown" id="waimaiBreakdown"></div>
+    <div class="cost-bars" id="costBars"><h3>成本结构占比（占总收入）</h3></div>
+    <div class="ai-report">
+      <div class="ai-report-header">
+        <div class="ai-avatar">🤖</div>
+        <div><div class="ai-name">掌盈 AI</div><div class="ai-role">专注餐饮经营分析</div></div>
+      </div>
+      <div class="ai-content" id="aiContent"></div>
+    </div>
+    <div class="cta-card">
+      <h3>下个月继续追踪 📈</h3>
+      <p>每月填一次，AI帮你对比趋势<br>发现你自己发现不了的经营规律</p>
+      <button class="btn-reset" onclick="resetForm()">重新填写下个月数据</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const num=id=>parseFloat($(id).value)||0;
+const fmt=n=>n.toLocaleString('zh-CN',{maximumFractionDigits:0});
+const pct=n=>(n*100).toFixed(1)+'%';
+
+function showError(msg){const b=$('errorBox');b.textContent=msg;b.classList.add('show')}
+function hideError(){$('errorBox').classList.remove('show')}
+
+function validate(){
+  const k=$('apiKey').value.trim();
+  if(!k||!k.startsWith('sk-ant')){showError('❌ 请填写正确的 Claude API Key（以 sk-ant 开头）');$('apiKey').focus();return false}
+  if(!$('shopName').value.trim()){showError('❌ 请填写餐厅名称');return false}
+  if(!$('month').value.trim()){showError('❌ 请填写月份');return false}
+  if(!$('shopType').value){showError('❌ 请选择餐厅类型');return false}
+  const req=['bizDays','meituanIncome','dineIncome','meituanGmv','commRate','packFee','foodBuy','stockEnd','kitchenWage','frontWage','rent','util'];
+  for(const id of req){
+    if($(id).value===''){showError('❌ 请填写所有标红必填项');$(id).scrollIntoView({behavior:'smooth',block:'center'});return false}
+  }
+  return true;
+}
+
+function calc(){
+  const mi=num('meituanIncome'),di=num('dineIncome'),op=num('otherPlatform');
+  const gmv=num('meituanGmv'),cr=num('commRate')/100,ad=num('adFee'),pk=num('packFee');
+  const fb=num('foodBuy'),ss=num('stockStart'),se=num('stockEnd');
+  const kw=num('kitchenWage'),fw=num('frontWage'),ow=num('otherWage');
+  const rent=num('rent'),ut=num('util'),oc=num('otherCost');
+  const bd=num('bizDays'),tc=num('tableCnt'),ar=num('area'),tp=num('targetProfit');
+
+  const totalIncome=mi+di+op;
+  const comm=gmv*cr,wCost=comm+ad+pk,wNet=gmv-comm-ad-pk,wNetPct=gmv>0?wNet/gmv:0;
+  const foodReal=ss+fb-se,foodRate=totalIncome>0?foodReal/totalIncome:0;
+  const labor=kw+fw+ow,laborRate=totalIncome>0?labor/totalIncome:0;
+  const fixed=rent+ut+oc,fixedRate=totalIncome>0?fixed/totalIncome:0;
+  const platRate=totalIncome>0?wCost/totalIncome:0;
+  const totalCost=foodReal+labor+wCost+fixed;
+  const net=totalIncome-totalCost,margin=totalIncome>0?net/totalIncome:0;
+  const daily=bd>0?totalIncome/bd:0,tableAvg=tc>0?di/tc:0;
+
+  return{totalIncome,mi,di,op,gmv,comm,ad,pk,wCost,wNet,wNetPct,
+         foodReal,foodRate,labor,laborRate,fixed,fixedRate,platRate,
+         totalCost,net,margin,daily,tableAvg,tp,ar,bd,tc};
+}
+
+function renderNumbers(d){
+  $('numbersGrid').innerHTML=[
+    {label:'月度总收入',value:'¥'+fmt(d.totalIncome),sub:`日均 ¥${fmt(d.daily)}`,cls:'highlight',vc:'blue'},
+    {label:'月度净利润',value:'¥'+fmt(d.net),sub:`毛利率 ${pct(d.margin)}`,cls:d.net>=0?'good':'warn',vc:d.net>=0?'green':'red'},
+    {label:'外卖真实净收入',value:'¥'+fmt(d.wNet),sub:`占GMV的 ${pct(d.wNetPct)}`,cls:d.wNet>=0?'':'warn',vc:d.wNet>=0?'amber':'red'},
+    d.tp>0
+      ?{label:'与目标利润差距',value:(d.net>=d.tp?'+¥':'-¥')+fmt(Math.abs(d.net-d.tp)),sub:`目标 ¥${fmt(d.tp)}`,cls:d.net>=d.tp?'good':'warn',vc:d.net>=d.tp?'green':'red'}
+      :{label:'食材成本率',value:pct(d.foodRate),sub:'警戒线 40%',cls:d.foodRate>0.4?'warn':'good',vc:d.foodRate>0.4?'red':'green'}
+  ].map(c=>`<div class="num-card ${c.cls}"><div class="num-label">${c.label}</div><div class="num-value ${c.vc}">${c.value}</div><div class="num-sub">${c.sub}</div></div>`).join('');
+}
+
+function renderWaimai(d){
+  $('waimaiBreakdown').innerHTML=`
+    <div class="wb-header">⚡ 外卖真实盈利拆解（很多老板从没算过）</div>
+    <div class="wb-row"><span class="wb-label">顾客实付 GMV</span><span class="wb-value">¥${fmt(d.gmv)}</span></div>
+    <div class="wb-row"><span class="wb-label">减：美团平台佣金</span><span class="wb-value minus">-¥${fmt(d.comm)}</span></div>
+    <div class="wb-row"><span class="wb-label">减：广告推广费</span><span class="wb-value minus">-¥${fmt(d.ad)}</span></div>
+    <div class="wb-row"><span class="wb-label">减：包装材料费</span><span class="wb-value minus">-¥${fmt(d.pk)}</span></div>
+    <div class="wb-row total"><span class="wb-label">= 扣除平台成本后净收入</span><span class="wb-value result">¥${fmt(d.wNet)}</span></div>
+    <div class="wb-row" style="background:rgba(239,68,68,0.05)">
+      <span class="wb-label" style="font-size:12px;color:var(--text3)">平台共抽走 GMV 的</span>
+      <span class="wb-value" style="color:var(--red);font-size:13px">${pct(d.gmv>0?d.wCost/d.gmv:0)}</span>
+    </div>`;
+}
+
+function renderCostBars(d){
+  const items=[
+    {name:'食材成本',r:d.foodRate,warn:0.40,note:'警戒线40%'},
+    {name:'人工成本',r:d.laborRate,warn:0.25,note:'警戒线25%'},
+    {name:'外卖平台成本',r:d.platRate,warn:0.20,note:'含佣金/广告/包装'},
+    {name:'固定成本（租金+水电）',r:d.fixedRate,warn:0.15,note:''},
+  ];
+  const colors=['#f59e0b','#3b82f6','#ef4444','#8b5cf6'];
+  $('costBars').innerHTML='<h3>成本结构占比（占总收入）</h3>'+items.map((it,i)=>{
+    const w=it.r>it.warn;
+    return`<div class="cost-item">
+      <div class="cost-item-header">
+        <div class="cost-name">${it.name}${w?'<span class="cost-warn-tag">偏高</span>':'<span class="cost-ok-tag">正常</span>'}</div>
+        <div class="cost-pct" style="color:${w?'var(--red)':'var(--green)'}">${pct(it.r)}</div>
+      </div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.min(it.r*100,100)}%;background:${w?'var(--red)':colors[i]}"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function buildPrompt(d){
+  return`你是一个专注餐饮经营分析的AI顾问，语言直接接地气，用餐饮老板听得懂的话说话。
+
+${$('shopName').value.trim()}（${$('shopType').value}）${$('month').value.trim()}经营数据：
+
+【收入】总收入${fmt(d.totalIncome)}元 | 外卖到账${fmt(d.mi)}元 | 堂食${fmt(d.di)}元 | 日均${fmt(d.daily)}元
+
+【外卖拆解】GMV${fmt(d.gmv)}元 → 扣佣金${fmt(d.comm)}+广告${fmt(d.ad)}+包装${fmt(d.pk)} → 净收入${fmt(d.wNet)}元（占GMV的${pct(d.wNetPct)}）
+
+【成本结构】
+- 食材消耗：${fmt(d.foodReal)}元，成本率${pct(d.foodRate)}（警戒40%）
+- 人工：${fmt(d.labor)}元，成本率${pct(d.laborRate)}（警戒25%）
+- 外卖平台总成本：${fmt(d.wCost)}元，占收入${pct(d.platRate)}
+- 固定支出：${fmt(d.fixed)}元，占收入${pct(d.fixedRate)}
+
+【结论】净利润${fmt(d.net)}元 | 毛利率${pct(d.margin)}${d.tp>0?` | 目标${fmt(d.tp)}元 差距${fmt(Math.abs(d.net-d.tp))}元`:''}
+
+请严格按以下格式输出，不要废话：
+
+第一段【震惊时刻】
+以"你可能不知道，"开头，选最反常识的发现，必须包含具体金额。
+
+第二段【成本诊断】（3行以内）
+指出最异常的1-2项成本，说清楚数字和行业正常区间。
+
+第三段【本月行动】
+只给1条建议。格式：「建议你[具体操作]，预计每月可[节省/多赚]约XX元。」必须有金额。
+
+用"你"不要用"贵司"，语气直接，像朋友说话。`;
+}
+
+const steps=['正在计算各项成本比例…','分析外卖平台真实盈利…','对比行业基准数据…','AI正在生成个性化建议…','报告即将完成…'];
+let timer=null;
+function startSteps(){let i=0;$('loadingStep').textContent=steps[0];timer=setInterval(()=>{i=(i+1)%steps.length;$('loadingStep').textContent=steps[i]},3000)}
+function stopSteps(){if(timer){clearInterval(timer);timer=null}}
+
+async function handleSubmit(){
+  hideError();
+  if(!validate())return;
+  const apiKey=$('apiKey').value.trim();
+  const d=calc();
+  $('formArea').style.display='none';
+  $('loadingWrap').classList.add('show');
+  $('reportWrap').classList.remove('show');
+  startSteps();
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:buildPrompt(d)}]})
+    });
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`API错误 ${resp.status}`)}
+    const data=await resp.json();
+    const text=data.content[0].text;
+    stopSteps();
+    $('reportTitle').textContent=`${$('shopName').value.trim()} · ${$('month').value.trim()}`;
+    renderNumbers(d);renderWaimai(d);renderCostBars(d);
+    $('loadingWrap').classList.remove('show');
+    $('reportWrap').classList.add('show');
+    const el=$('aiContent');
+    el.innerHTML='<span class="cursor-blink"></span>';
+    let i=0;
+    const typed=setInterval(()=>{
+      if(i<text.length){el.innerHTML=text.slice(0,i+1).replace(/\n/g,'<br>')+'<span class="cursor-blink"></span>';i+=4;el.scrollIntoView({behavior:'smooth',block:'end'})}
+      else{el.innerHTML=text.replace(/\n/g,'<br>');clearInterval(typed)}
+    },25);
+    $('reportWrap').scrollIntoView({behavior:'smooth',block:'start'});
+  }catch(err){
+    stopSteps();
+    $('loadingWrap').classList.remove('show');
+    $('formArea').style.display='block';
+    showError(`❌ 分析失败：${err.message}\n\n请检查：\n1. API Key是否正确（以sk-ant开头）\n2. 账户是否有余额\n3. 网络是否正常`);
+  }
+}
+
+function resetForm(){
+  $('reportWrap').classList.remove('show');
+  $('formArea').style.display='block';
+  ['meituanIncome','dineIncome','tableCnt','meituanGmv','packFee','foodBuy','stockEnd','kitchenWage','frontWage','rent','util'].forEach(id=>{$(id).value=''});
+  ['otherPlatform','stockStart','otherWage','otherCost','adFee'].forEach(id=>{$(id).value='0'});
+  $('month').value='';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+
+// 保存API Key
+$('apiKey').addEventListener('change',()=>{try{localStorage.setItem('czKey',$('apiKey').value)}catch(e){}});
+try{const s=localStorage.getItem('czKey');if(s)$('apiKey').value=s}catch(e){}
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.ctrlKey)handleSubmit()});
+
+// ── Supabase 配置 ──────────────────────────────────
+const SUPA_URL = 'https://zuzybtdshegnignwjktd.supabase.co';
+const SUPA_KEY = 'sb_publishable_6fi0gBs2uzuoaecoOSK86A_X-N4nJvb';
+const supa = supabase.createClient(SUPA_URL, SUPA_KEY);
+
+// ── 登录状态管理 ───────────────────────────────────
+let currentUser = null;
+
+async function initAuth() {
+  const { data: { session } } = await supa.auth.getSession();
+  if (session) {
+    currentUser = session.user;
+    showApp();
+    loadHistory();
+  } else {
+    showLogin();
+  }
+  supa.auth.onAuthStateChange((event, session) => {
+    if (session) {
+      currentUser = session.user;
+      showApp();
+      loadHistory();
+    } else {
+      currentUser = null;
+      showLogin();
+    }
+  });
+}
+
+function showLogin() {
+  $('loginWrap').style.display = 'flex';
+  $('appWrap').style.display = 'none';
+  $('userBar').style.display = 'none';
+}
+
+function showApp() {
+  $('loginWrap').style.display = 'none';
+  $('appWrap').style.display = 'block';
+  $('userBar').style.display = 'flex';
+  $('userEmail').textContent = currentUser?.email || '';
+}
+
+async function sendMagicLink() {
+  const email = $('loginEmail').value.trim();
+  if (!email) { $('loginMsg').textContent = '请输入邮箱'; return; }
+  $('loginBtn').disabled = true;
+  $('loginMsg').textContent = '发送中…';
+  const { error } = await supa.auth.signInWithOtp({ email, options: { emailRedirectTo: window.location.href } });
+  if (error) {
+    $('loginMsg').textContent = '发送失败：' + error.message;
+    $('loginBtn').disabled = false;
+  } else {
+    $('loginMsg').textContent = '✅ 登录链接已发送到你的邮箱，点击链接即可登录';
+  }
+}
+
+async function logout() {
+  await supa.auth.signOut();
+}
+
+// ── 保存报告到Supabase ─────────────────────────────
+async function saveReport(formData, reportText, shopName) {
+  if (!currentUser) return;
+  const { error } = await supa.from('reports').insert({
+    user_id: currentUser.id,
+    shop_name: shopName,
+    form_data: formData,
+    report_text: reportText,
+  });
+  if (error) console.error('保存失败:', error);
+  else loadHistory();
+}
+
+// ── 加载历史记录 ───────────────────────────────────
+async function loadHistory() {
+  if (!currentUser) return;
+  const { data, error } = await supa.from('reports')
+    .select('id, created_at, shop_name, report_text')
+    .order('created_at', { ascending: false })
+    .limit(10);
+  if (error || !data?.length) {
+    $('historyList').innerHTML = '<div style="color:var(--text3);font-size:12px;padding:12px">暂无历史记录</div>';
+    return;
+  }
+  $('historyList').innerHTML = data.map(r => `
+    <div class="history-item" onclick="viewReport('${r.id}')">
+      <div class="hi-name">${r.shop_name || '未命名'}</div>
+      <div class="hi-date">${new Date(r.created_at).toLocaleDateString('zh-CN')}</div>
+      <div class="hi-preview">${(r.report_text||'').slice(0,60)}…</div>
+    </div>
+  `).join('');
+}
+
+async function viewReport(id) {
+  const { data } = await supa.from('reports').select('*').eq('id', id).single();
+  if (!data) return;
+  // 填回表单
+  if (data.form_data) {
+    const f = data.form_data;
+    Object.keys(f).forEach(k => { if($(k)) $(k).value = f[k]; });
+  }
+  // 显示报告
+  if (data.report_text) {
+    $('reportTitle').textContent = (data.shop_name || '') + ' · 历史报告';
+    $('reportSub').textContent = new Date(data.created_at).toLocaleDateString('zh-CN');
+    const d = calc();
+    renderNumbers(d); renderWaimai(d); renderCostBars(d);
+    $('aiContent').innerHTML = data.report_text.replace(/\n/g,'<br>');
+    $('formArea').style.display = 'none';
+    $('reportWrap').classList.add('show');
+    $('reportWrap').scrollIntoView({ behavior: 'smooth' });
+  }
+  $('historyPanel').style.display = 'none';
+}
+
+// ── 重写 handleSubmit 加入保存逻辑 ─────────────────
+const _origSubmit = handleSubmit;
+async function handleSubmitWithSave() {
+  hideError();
+  if(!validate())return;
+  const apiKey=$('apiKey').value.trim();
+  const d=calc();
+  $('formArea').style.display='none';
+  $('loadingWrap').classList.add('show');
+  $('reportWrap').classList.remove('show');
+  startSteps();
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:800,messages:[{role:'user',content:buildPrompt(d)}]})
+    });
+    if(!resp.ok){const e=await resp.json().catch(()=>({}));throw new Error(e.error?.message||`API错误 ${resp.status}`)}
+    const data=await resp.json();
+    const text=data.content[0].text;
+    stopSteps();
+
+    // 收集表单数据用于保存
+    const formData = {};
+    ['shopName','month','shopType','bizDays','area','targetProfit','meituanIncome','dineIncome',
+     'otherPlatform','tableCnt','meituanGmv','commRate','adFee','packFee','foodBuy','stockEnd',
+     'stockStart','kitchenWage','frontWage','otherWage','rent','util','otherCost'].forEach(id=>{
+      if($(id)) formData[id] = $(id).value;
+    });
+
+    $('reportTitle').textContent=`${$('shopName').value.trim()} · ${$('month').value.trim()}`;
+    $('reportSub').textContent='分析完成 · 以下是你本月的经营情况';
+    renderNumbers(d);renderWaimai(d);renderCostBars(d);
+    $('loadingWrap').classList.remove('show');
+    $('reportWrap').classList.add('show');
+    const el=$('aiContent');
+    el.innerHTML='<span class="cursor-blink"></span>';
+    let i=0;
+    const typed=setInterval(()=>{
+      if(i<text.length){el.innerHTML=text.slice(0,i+1).replace(/\n/g,'<br>')+'<span class="cursor-blink"></span>';i+=4;el.scrollIntoView({behavior:'smooth',block:'end'})}
+      else{el.innerHTML=text.replace(/\n/g,'<br>');clearInterval(typed)}
+    },25);
+    $('reportWrap').scrollIntoView({behavior:'smooth',block:'start'});
+
+    // 自动保存到Supabase
+    if (currentUser) {
+      await saveReport(formData, text, $('shopName').value.trim());
+    }
+
+  }catch(err){
+    stopSteps();
+    $('loadingWrap').classList.remove('show');
+    $('formArea').style.display='block';
+    showError(`❌ 分析失败：${err.message}\n\n请检查：\n1. API Key是否正确\n2. 账户是否有余额\n3. 网络是否正常`);
+  }
+}
+
+// 覆盖原来的 handleSubmit
+window.handleSubmit = handleSubmitWithSave;
+
+// 启动
+initAuth();
+</script>
+
+</div><!-- /appWrap -->
+
+<!-- 登录界面 -->
+<div id="loginWrap" style="display:none;position:fixed;inset:0;background:var(--bg);z-index:999;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <div style="max-width:360px;width:100%;background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;">
+    <div style="text-align:center;margin-bottom:24px;">
+      <div style="font-size:32px;margin-bottom:8px;">🍜</div>
+      <div style="font-size:22px;font-weight:700;color:var(--text)">掌盈</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:4px;">把经营数据变成行动建议</div>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:12px;">输入邮箱，我们发送登录链接给你：</div>
+    <input id="loginEmail" type="email" placeholder="your@email.com"
+      style="width:100%;background:var(--bg2);border:1px solid var(--border2);border-radius:8px;padding:12px 14px;color:var(--text);font-size:14px;font-family:inherit;outline:none;margin-bottom:12px;"
+      onkeydown="if(event.key==='Enter')sendMagicLink()">
+    <button id="loginBtn" onclick="sendMagicLink()"
+      style="width:100%;padding:13px;background:linear-gradient(135deg,var(--blue),#6366f1);border:none;border-radius:8px;color:white;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;">
+      发送登录链接
+    </button>
+    <div id="loginMsg" style="margin-top:12px;font-size:12px;color:var(--text2);min-height:20px;text-align:center;line-height:1.6;"></div>
+  </div>
+</div>
+
+<!-- 用户栏（登录后显示） -->
+<div id="userBar" style="display:none;position:fixed;bottom:16px;right:16px;z-index:200;background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 12px;gap:10px;align-items:center;">
+  <span id="userEmail" style="font-size:11px;color:var(--text3);max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+  <button onclick="$('historyPanel').style.display='block'"
+    style="font-size:11px;background:var(--blue-dim);color:var(--blue2);border:1px solid rgba(59,130,246,0.3);border-radius:6px;padding:4px 8px;cursor:pointer;font-family:inherit;">
+    📋 历史
+  </button>
+  <button onclick="logout()"
+    style="font-size:11px;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:6px;padding:4px 8px;cursor:pointer;font-family:inherit;">
+    退出
+  </button>
+</div>
+
+<!-- 历史记录面板 -->
+<div id="historyPanel" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:300;align-items:flex-end;justify-content:center;" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--bg2);border-radius:16px 16px 0 0;padding:20px;width:100%;max-width:680px;max-height:70vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+      <div style="font-size:16px;font-weight:700;color:var(--text)">📋 历史报告</div>
+      <button onclick="$('historyPanel').style.display='none'" style="background:transparent;border:none;color:var(--text3);font-size:20px;cursor:pointer;">×</button>
+    </div>
+    <div id="historyList"></div>
+  </div>
+</div>
+
+<style>
+#appWrap { display: block; }
+.history-item{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px;margin-bottom:8px;cursor:pointer;transition:all 0.15s;}
+.history-item:hover{border-color:var(--blue);background:var(--bg3);}
+.hi-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px;}
+.hi-date{font-size:11px;color:var(--text3);margin-bottom:5px;}
+.hi-preview{font-size:11px;color:var(--text2);line-height:1.5;}
+</style>
+</body>
+</html>
